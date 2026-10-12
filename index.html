@@ -13,7 +13,37 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="뭉치의 냉장고 털기">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}
+#ext{position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:#0F1114;color:#E8EAEC;font:16px/1.5 "Apple SD Gothic Neo","Malgun Gothic",sans-serif;text-align:center}
+#ext img{width:88px;height:88px;border-radius:20px}#ext a{display:inline-block;padding:13px 22px;border-radius:999px;background:#F5C531;color:#17191C;font-weight:700;text-decoration:none}#ext small{color:#9AA1A8}</style>
+<script>
+// 카카오톡 등 앱 안 브라우저로 열리면 아이폰은 Safari, 안드로이드는 Chrome으로 자동으로 다시 열기
+(function(){
+  var ua = navigator.userAgent, url = location.href;
+  var android = /Android/i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua);
+  var kakao = /KAKAOTALK/i.test(ua);
+  var otherInApp = /NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|Whale\/.*inapp|; wv\)/i.test(ua);
+  if (!kakao && !otherInApp) return;
+  var chrome = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=" + encodeURIComponent(url) + ";end";
+  var target = android ? chrome
+    : kakao ? "kakaotalk://web/openExternal?url=" + encodeURIComponent(url)
+    : ios ? "x-safari-" + url : null;
+  if (!target) return;
+  window.__extTarget = target;
+  if (/[?&]stay=1/.test(location.search)) return;
+  location.href = target;
+  document.addEventListener("DOMContentLoaded", function(){
+    var b = document.createElement("div"); b.id = "ext";
+    b.innerHTML = '<img src="icon-180.png" alt="">' +
+      '<strong>' + (ios ? "Safari" : "Chrome") + '에서 여는 중이에요</strong>' +
+      '<span>카카오톡 안에서는 홈 화면 설치가 안 돼서<br>바깥 브라우저로 옮겨 열어요.</span>' +
+      '<a href="' + target + '">' + (ios ? "Safari" : "Chrome") + '로 열기</a>' +
+      '<small>안 열리면 오른쪽 아래(아이폰) 또는 오른쪽 위(안드로이드) 메뉴에서<br>“다른 브라우저로 열기”를 눌러주세요.</small>' +
+      '<small><a href="?stay=1" style="background:none;color:#9AA1A8;padding:0;font-weight:400;text-decoration:underline">그냥 여기서 볼게요</a></small>';
+    document.body.appendChild(b);
+  });
+})();
+</script>
 </head>
 <body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
