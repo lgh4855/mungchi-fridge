@@ -63,6 +63,8 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body,button,a,input,label{touch-action:manipulation}
 html{background:var(--bg)}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
 #heist{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -101,7 +103,7 @@ h1 em{font-style:normal;background:linear-gradient(transparent 58%,var(--tape) 5
 @media (min-width:821px){.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}}
 .label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
 .inputrow{display:flex;gap:8px}
-#ing-input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+#ing-input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
 #ing-input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button{font:inherit;cursor:pointer}
 .btn{border:0;border-radius:10px;padding:10px 16px;background:var(--accent);color:var(--on-accent);font-weight:700}
@@ -171,6 +173,8 @@ button{font:inherit;cursor:pointer}
 .ytlist .tt{display:block;font-size:14px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
 .ytlist .vv{display:block;font-size:12px;color:var(--yt);margin-top:2px}
 .jump{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:5;border:0;border-radius:999px;padding:11px 18px;background:var(--accent);color:var(--on-accent);font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px);white-space:nowrap}
+.custom-group{border:1px dashed var(--hot);border-radius:16px;padding:18px;background:var(--surface)}
+.custom-group h2{color:var(--hot)}
 .main-group{border:1px solid var(--accent);border-radius:16px;padding:18px;background:var(--surface)}
 .main-group h2{color:var(--accent)}
 .label.others{font-family:var(--display);font-size:18px;font-weight:400;letter-spacing:0;color:var(--muted);margin-bottom:-14px}
@@ -272,6 +276,7 @@ button{font:inherit;cursor:pointer}
       <div class="mine" id="mine"></div>
       <p class="hint" id="example-hint">뭉치가 먼저 돼지고기·파·마늘을 털어놨어요. 우리 집 냉장고 재료로 바꿔보세요. 쉼표로 여러 개를 한 번에 넣을 수 있어요.</p>
       <button class="clear" id="clear" type="button">모두 지우기</button>
+      <label class="easy-toggle" for="trend-on"><input type="checkbox" id="trend-on"> <span><strong>요즘 뜨는 작전 보기</strong><br><small>재료별 유튜브 인기 숏츠와 유행 레시피를 맨 위에 보여줘요</small></span></label>
       <label class="easy-toggle" for="easy"><input type="checkbox" id="easy"> <span><strong>10분 안에 털고 튀기</strong><br><small>초간단 요리만 보여줘요</small></span></label>
       <div class="picks" id="picks"></div>
     </aside>
@@ -517,7 +522,8 @@ const KEY = "fridge-ings-v1";
 let mine = [];
 let touched = false;
 let focusIng = null;
-let easyOnly = false;
+let easyOnly = false, showTrend = false;
+try { showTrend = localStorage.getItem("fridge-trend") === "1"; } catch (e) {}
 try { easyOnly = localStorage.getItem("fridge-easy") === "1"; } catch (e) {}
 // 지난번 재료는 바로 채우지 않고 '내 냉장고'에 넣어둔 채로 시작 → 눌러서 꺼내요
 let pending = null, fridgeOpening = false;
@@ -525,7 +531,18 @@ try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (Array.i
 if (!touched) mine = ["돼지고기","파","마늘"];
 const union = (a, b) => [...a, ...b.filter(x => !a.includes(x))];
 
-const norm = s => { const k = String(s).trim().replace(/\s+/g,""); return ALIAS[k] || k; };
+const KNOWN = new Set([...CATS.flatMap(c => c.items), ...R.flatMap(r => [...r.m, ...r.o])]);
+const norm = s => {
+  const k = String(s).trim().replace(/\s+/g,"");
+  if (!k) return k;
+  if (ALIAS[k]) return ALIAS[k];
+  if (KNOWN.has(k)) return k;
+  // "새송이버섯"→버섯, "냉동새우"→새우, "청양고추"→고추처럼 아는 재료 이름이 들어 있으면 그 재료로
+  const hit = [...Object.keys(ALIAS), ...KNOWN].filter(w => w.length >= 2 && k.includes(w)).sort((a, b) => b.length - a.length)[0];
+  return hit ? (ALIAS[hit] || hit) : k;
+};
+const PICKS = new Set(CATS.flatMap(c => c.items));
+const isCustom = x => !PICKS.has(x);
 // sp=CAMSAhAB: sort by view count, videos only
 const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q) + "&sp=CAMSAhAB";
 // Shorts filter (YouTube can't combine it with date or sort filters)
@@ -552,14 +569,17 @@ let jumpTimer = 0;
 function showJump(x){
   const b = $("jump"); if (!b || innerWidth > 820) return;
   const n = (YT_ING[x] || []).length;
-  b.textContent = n ? x + " 숏츠 " + n + "개 보기 ↓" : x + " 요리 보기 ↓";
+  b.textContent = (n && showTrend) ? x + " 숏츠 " + n + "개 보기 ↓" : x + " 요리 보기 ↓";
   b.hidden = false; clearTimeout(jumpTimer); jumpTimer = setTimeout(() => { b.hidden = true; }, 5000);
 }
 
 $("ing-form").addEventListener("submit", e => { e.preventDefault(); const v = $("ing-input").value; if (v.trim()) add(v); $("ing-input").value = ""; $("ing-input").focus(); });
 $("easy").checked = easyOnly;
 $("easy").addEventListener("change", e => { easyOnly = e.target.checked; try { localStorage.setItem("fridge-easy", easyOnly ? "1" : "0"); } catch (err) {} renderResults(); renderOps(); });
-$("jump").addEventListener("click", () => { $("jump").hidden = true; document.getElementById("trend")?.scrollIntoView({behavior:"smooth", block:"start"}); });
+$("trend-on").checked = showTrend;
+$("trend-on").addEventListener("change", e => { showTrend = e.target.checked; try { localStorage.setItem("fridge-trend", showTrend ? "1" : "0"); } catch (err) {} renderResults(); });
+const scrollResults = () => (document.getElementById("trend") || document.querySelector(".results > section, .results > .group"))?.scrollIntoView({behavior:"smooth", block:"start"});
+$("jump").addEventListener("click", () => { $("jump").hidden = true; scrollResults(); });
 function renderFridge(){
   const b = $("myfridge"); if (!b) return;
   if (!pending || !pending.length) { if (!fridgeOpening) b.hidden = true; return; }
@@ -593,7 +613,7 @@ function renderPanel(){
   if (!mine.length) box.append(el("span","hint","아직 넣은 재료가 없어요."));
   mine.forEach(x => {
     const c = el("span","chip");
-    const nm = el("button", null, x); nm.type = "button"; nm.style.cssText = "font-weight:inherit;padding:0"; nm.title = x + " 유행 레시피 보기"; nm.onclick = () => { focusOn(x); document.getElementById("trend")?.scrollIntoView({behavior:"smooth", block:"start"}); };
+    const nm = el("button", null, x); nm.type = "button"; nm.style.cssText = "font-weight:inherit;padding:0"; nm.title = x + " 유행 레시피 보기"; nm.onclick = () => { focusOn(x); scrollResults(); };
     c.append(nm);
     const b = el("button", null, "×"); b.type = "button"; b.setAttribute("aria-label", x + " 빼기");
     b.onclick = () => toggle(x); c.append(b); box.append(c);
@@ -677,9 +697,25 @@ function renderResults(){
     const a = el("a","yt","숏츠에서 검색"); a.href = ytShorts(mine.join(" ") + " 요리 레시피"); a.target = "_blank"; a.rel = "noopener";
     combo.append(p, a); out.append(combo);
   }
-  out.append(trendSection());
+  if (showTrend) out.append(trendSection());
   let list = match();
   const mains = mine.filter(isMain), shown = new Set();
+  // 레시피 수첩에 없는 재료: 이름·설명·양념에 들어간 요리 + 유튜브에서 찾기
+  mine.filter(isCustom).forEach(cx => {
+    const sec = el("section","group custom-group");
+    const h = el("h2", null, "직접 담은 재료 · " + cx); sec.append(h);
+    const long = cx.length >= 2; // 한 글자(김 등)는 '김치'처럼 잘못 걸리지 않게 정확히 같은 재료만
+    const rel = R.filter(r => r.m.includes(cx) || r.o.includes(cx) || r.s.includes(cx) || (long && (r.n.includes(cx) || (r.d || "").includes(cx) || r.s.some(v => v.includes(cx)))));
+    sec.append(el("p", null, rel.length ? cx + iga(cx) + " 들어가는 요리를 수첩에서 찾았어요. 유튜브에서 더 찾아볼 수도 있어요." : "뭉치의 레시피 수첩에는 아직 " + cx + " 요리가 없어요. 유튜브에서 바로 찾아볼게요."));
+    const live = el("div","live");
+    const go = (t, u) => { const a = el("a", null, t); a.href = u; a.target = "_blank"; a.rel = "noopener"; return a; };
+    live.append(go(cx + " 숏츠 레시피", ytShorts(cx + " 요리 레시피")), go(cx + " 인기 영상", yt(cx + " 요리 레시피")));
+    const other = mine.find(x => x !== cx && isMain(x)) || mine.find(x => x !== cx);
+    if (other) live.append(go(cx + " + " + other + " 숏츠", ytShorts(cx + " " + other + " 레시피")));
+    sec.append(live);
+    if (rel.length) { const cards = el("div","cards"); cards.style.marginTop = "12px"; rel.slice(0, 6).forEach(r => { const have = new Set(mine); cards.append(card({...r, got:r.m.filter(x=>have.has(x)), opt:r.o.filter(x=>have.has(x)), miss:r.m.filter(x=>!have.has(x))})); }); sec.append(cards); }
+    out.append(sec);
+  });
   mains.forEach(mx => {
     const sub = list.filter(r => r.m.includes(mx) && !shown.has(r.n))
       .sort((a, b) => a.miss.length - b.miss.length || (b.got.length + b.opt.length) - (a.got.length + a.opt.length) || (a.min || 99) - (b.min || 99));
@@ -695,7 +731,7 @@ function renderResults(){
   if (ready.length) out.append(group("지금 바로 털 수 있어요", ready.length + "가지", "필요한 주재료가 다 있어요. 양념만 있는지 확인해보세요.", ready));
   if (one.length) out.append(group("하나만 더 털어오면", one.length + "가지", "빨간 점선 재료 하나만 구해오면 돼요.", one));
   if (two.length) out.append(group("두 개만 더 털어오면", two.length + "가지", null, two));
-  if (!list.length && !shown.size) out.append(el("div","empty", mine.length ? (easyOnly ? "이 재료로 10분 안에 되는 요리는 못 찾았어요. 재료를 더 넣거나 초간단 필터를 꺼보세요." : "이 재료로 맞는 요리를 목록에서 못 찾았어요. 재료를 더 넣거나 아래에서 Claude에게 물어보세요.") : (pending ? "내 냉장고를 누르면 지난번에 담아둔 재료를 꺼내와요." : "냉장고가 텅 비었어요. 재료를 담아주면 뭉치가 출동해요.")));
+  if (!list.length && !shown.size && !mine.some(isCustom)) out.append(el("div","empty", mine.length ? (easyOnly ? "이 재료로 10분 안에 되는 요리는 못 찾았어요. 재료를 더 넣거나 초간단 필터를 꺼보세요." : "이 재료로 맞는 요리를 목록에서 못 찾았어요. 재료를 더 넣거나 아래에서 Claude에게 물어보세요.") : (pending ? "내 냉장고를 누르면 지난번에 담아둔 재료를 꺼내와요." : "냉장고가 텅 비었어요. 재료를 담아주면 뭉치가 출동해요.")));
   renderAI(); out.append(aiSection);
 }
 
