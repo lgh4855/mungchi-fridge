@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>뭉치의 냉장고 털기</title>
 <meta name="description" content="냉장고 재료로 만들 수 있는 요리와 유튜브 숏츠 레시피를 찾아주는 뭉치의 냉장고 털기">
 <meta name="theme-color" content="#0F1114">
@@ -857,6 +857,12 @@ render();
 if (window.claude && window.claude.use) {
   window.claude.use("sample").then(s => { if (s) { sampleFn = s; renderAI(); } }).catch(() => {});
 }
+
+// 손가락 두 개로 확대(핀치 줌) 막기 — 아이폰 사파리는 viewport 설정을 무시해서 제스처를 직접 막음
+["gesturestart","gesturechange","gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive:false}));
+document.addEventListener("touchmove", e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, {passive:false});
+let lastTouch = 0;
+document.addEventListener("touchend", e => { const n = Date.now(); if (n - lastTouch < 300 && !e.target.closest("input")) e.preventDefault(); lastTouch = n; }, {passive:false});
 
 // 홈 화면 설치: GitHub 전용 주소에서는 실제 설치, Claude 링크에서는 설치 페이지로 연결
 const SITE_URL = "https://lgh4855.github.io/mungchi-fridge/";
