@@ -199,7 +199,10 @@ button{font:inherit;cursor:pointer}
 .fz-door .fz-handle{top:10px;height:22px}
 .fz-mag{position:absolute;left:6px;top:8px;width:30px;height:auto}
 .fz-note{position:absolute;left:8px;bottom:6px;font-size:10px;font-weight:700;padding:1px 4px;background:var(--tape);color:var(--tape-ink);transform:rotate(-6deg)}
-.myfridge.open .fz-door{transform:rotateY(-115deg)}
+.myfridge.open .fz-door{transform:rotateY(-115deg);transition-duration:.2s}
+.myfridge.shut{animation:thud .5s .55s ease both}
+@keyframes thud{30%{transform:translateX(-3px) rotate(-1deg)}60%{transform:translateX(3px) rotate(1deg)}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){.myfridge.shut{animation:none}}
 .myfridge.open .fz-inside i{animation:pop .5s ease both}
 @keyframes pop{0%{transform:scale(.2);opacity:0}60%{transform:scale(1.25)}100%{transform:none;opacity:1}}
 .fz-text{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -669,7 +672,7 @@ function renderFridge(){
   if (!pending || !pending.length) { if (!fridgeOpening) b.hidden = true; return; }
   b.hidden = false;
   $("fz-note").textContent = pending.length + "개";
-  $("fz-sub").textContent = "지난번에 담아둔 재료 " + pending.length + "개가 들어 있어요";
+  $("fz-sub").textContent = "넣어둔 재료 " + pending.length + "개가 들어 있어요";
 }
 function openFridge(){
   if (!pending || fridgeOpening) return;
@@ -690,14 +693,23 @@ function openFridge(){
 }
 $("myfridge").addEventListener("click", openFridge);
 let saveTimer = 0;
+// 냉장고에 넣어두기: 담은 재료를 냉장고 안에 넣고 문을 닫은 뒤 저장
 $("savebtn").addEventListener("click", () => {
-  save();
-  const n = pending ? union(pending, mine).length : mine.length;
-  const b = $("savebtn"), m = $("savemsg");
-  b.classList.add("done"); b.textContent = "넣어뒀어요 ✓";
-  m.textContent = n ? "재료 " + n + "개를 내 냉장고에 넣어뒀어요. 다음에 들어오면 냉장고를 눌러 꺼내면 돼요." : "냉장고를 비워뒀어요.";
+  const items = pending ? union(pending, mine) : [...mine];
+  if (!items.length || fridgeOpening) return;
+  pending = items; mine = []; focusIng = null;
+  save(); render();
+  const b = $("myfridge"), inside = $("fz-inside"), m = $("savemsg");
+  inside.replaceChildren();
+  items.forEach(x => { const t = document.createElement("i"); t.textContent = x; inside.append(t); });
+  b.classList.add("open");
+  b.scrollIntoView({behavior: "smooth", block: "center"});
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(() => { b.classList.remove("open"); b.classList.add("shut"); }, reduce ? 0 : 650);
+  setTimeout(() => b.classList.remove("shut"), reduce ? 0 : 1500);
+  m.textContent = "재료 " + items.length + "개를 넣고 냉장고 문을 닫았어요. 다음에 냉장고를 누르면 다시 꺼낼 수 있어요.";
   m.hidden = false; clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { b.classList.remove("done"); b.textContent = "냉장고에 넣어두기"; m.hidden = true; }, 3000);
+  saveTimer = setTimeout(() => { m.hidden = true; }, 4000);
 });
 $("clear").addEventListener("click", () => { mine = []; save(); render(); });
 
@@ -714,7 +726,7 @@ function renderPanel(){
   });
   $("example-hint").hidden = touched;
   $("clear").hidden = !mine.length;
-  $("savebtn").hidden = !mine.length && !pending;
+  $("savebtn").hidden = !mine.length;
   const picks = $("picks"); picks.replaceChildren();
   CATS.forEach(cat => {
     let g;

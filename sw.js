@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 앱 파일을 저장. 새 버전이 올라오면 자동으로 교체됨
-const CACHE = "mungchi-45c0d8e1fd";
+const CACHE = "mungchi-8b0e260908";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
