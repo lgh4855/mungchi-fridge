@@ -200,7 +200,7 @@ button{font:inherit;cursor:pointer}
 .fz-mag{position:absolute;left:6px;top:8px;width:30px;height:auto}
 .fz-note{position:absolute;left:8px;bottom:6px;font-size:10px;font-weight:700;padding:1px 4px;background:var(--tape);color:var(--tape-ink);transform:rotate(-6deg)}
 .myfridge.open .fz-door{transform:rotateY(-115deg);transition-duration:.2s}
-.myfridge.shut{animation:thud .5s .55s ease both}
+.myfridge.shut{animation:thud .5s .25s ease both}
 @keyframes thud{30%{transform:translateX(-3px) rotate(-1deg)}60%{transform:translateX(3px) rotate(1deg)}100%{transform:none}}
 @media (prefers-reduced-motion:reduce){.myfridge.shut{animation:none}}
 .myfridge.open .fz-inside i{animation:pop .5s ease both}
@@ -699,14 +699,12 @@ $("savebtn").addEventListener("click", () => {
   if (!items.length || fridgeOpening) return;
   pending = items; mine = []; focusIng = null;
   save(); render();
-  const b = $("myfridge"), inside = $("fz-inside"), m = $("savemsg");
-  inside.replaceChildren();
-  items.forEach(x => { const t = document.createElement("i"); t.textContent = x; inside.append(t); });
-  b.classList.add("open");
-  b.scrollIntoView({behavior: "smooth", block: "center"});
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(() => { b.classList.remove("open"); b.classList.add("shut"); }, reduce ? 0 : 650);
-  setTimeout(() => b.classList.remove("shut"), reduce ? 0 : 1500);
+  // 처음 들어왔을 때와 같은 화면: 맨 위로 올라가고, 닫힌 냉장고만 보이게
+  const b = $("myfridge"), m = $("savemsg");
+  b.classList.remove("open");
+  $("jump").hidden = true; clearTimeout(jumpTimer);
+  window.scrollTo({top: 0, behavior: "smooth"});
+  b.classList.add("shut"); setTimeout(() => b.classList.remove("shut"), 1100);
   m.textContent = "재료 " + items.length + "개를 넣고 냉장고 문을 닫았어요. 다음에 냉장고를 누르면 다시 꺼낼 수 있어요.";
   m.hidden = false; clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { m.hidden = true; }, 4000);
