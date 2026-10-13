@@ -116,6 +116,10 @@ button{font:inherit;cursor:pointer}
 .hint{font-size:13px;color:var(--muted);margin:0}
 .picks{display:flex;flex-direction:column;gap:12px}
 .picks .row{display:flex;flex-wrap:wrap;gap:6px}
+.saverow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.savebtn{border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px}
+.savebtn.done{background:var(--accent);color:var(--on-accent)}
+#savemsg{color:var(--accent)}
 .clear{align-self:flex-start;border:0;background:none;color:var(--muted);text-decoration:underline;padding:0;font-size:13px}
 
 .results{display:flex;flex-direction:column;gap:26px;min-width:0}
@@ -279,7 +283,11 @@ button{font:inherit;cursor:pointer}
       </div>
       <div class="mine" id="mine"></div>
       <p class="hint" id="example-hint">뭉치가 먼저 돼지고기·파·마늘을 털어놨어요. 우리 집 냉장고 재료로 바꿔보세요. 쉼표로 여러 개를 한 번에 넣을 수 있어요.</p>
-      <button class="clear" id="clear" type="button">모두 지우기</button>
+      <div class="saverow">
+        <button class="savebtn" id="savebtn" type="button">냉장고에 넣어두기</button>
+        <button class="clear" id="clear" type="button">모두 지우기</button>
+      </div>
+      <p class="hint" id="savemsg" role="status" hidden></p>
       <label class="easy-toggle" for="trend-on"><input type="checkbox" id="trend-on"> <span><strong>요즘 뜨는 작전 보기</strong><br><small>재료별 유튜브 인기 숏츠와 유행 레시피를 맨 위에 보여줘요</small></span></label>
       <label class="easy-toggle" for="easy"><input type="checkbox" id="easy"> <span><strong>10분 안에 털고 튀기</strong><br><small>초간단 요리만 보여줘요</small></span></label>
       <div class="picks" id="picks"></div>
@@ -681,6 +689,16 @@ function openFridge(){
   }, reduce ? 0 : 1200 + pending.length * 70);
 }
 $("myfridge").addEventListener("click", openFridge);
+let saveTimer = 0;
+$("savebtn").addEventListener("click", () => {
+  save();
+  const n = pending ? union(pending, mine).length : mine.length;
+  const b = $("savebtn"), m = $("savemsg");
+  b.classList.add("done"); b.textContent = "넣어뒀어요 ✓";
+  m.textContent = n ? "재료 " + n + "개를 내 냉장고에 넣어뒀어요. 다음에 들어오면 냉장고를 눌러 꺼내면 돼요." : "냉장고를 비워뒀어요.";
+  m.hidden = false; clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { b.classList.remove("done"); b.textContent = "냉장고에 넣어두기"; m.hidden = true; }, 3000);
+});
 $("clear").addEventListener("click", () => { mine = []; save(); render(); });
 
 function renderPanel(){
@@ -696,6 +714,7 @@ function renderPanel(){
   });
   $("example-hint").hidden = touched;
   $("clear").hidden = !mine.length;
+  $("savebtn").hidden = !mine.length && !pending;
   const picks = $("picks"); picks.replaceChildren();
   CATS.forEach(cat => {
     let g;
