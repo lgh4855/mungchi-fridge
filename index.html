@@ -100,7 +100,21 @@ h1 em{font-style:normal;background:linear-gradient(transparent 58%,var(--tape) 5
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px 18px 18px;display:flex;flex-direction:column;gap:16px;position:relative;box-shadow:inset 0 0 0 6px var(--bg)}
 .panel::before{content:"";position:absolute;top:22px;right:14px;width:6px;height:64px;border-radius:6px;background:var(--line)}
 .panel .label.door{font-family:var(--display);font-size:20px;font-weight:400;letter-spacing:0;color:var(--ink)}
-@media (min-width:821px){.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}}
+@media (min-width:821px){.panel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);max-height:calc(100vh - 32px - env(safe-area-inset-top,0px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
+/* 휴대폰: 아래 탭으로 냉장고(재료) / 레시피 화면을 나눠요 */
+.tabbar{display:none}
+@media (max-width:820px){
+  .tabbar{display:grid;grid-template-columns:1fr 1fr;position:fixed;left:0;right:0;bottom:0;z-index:30;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));gap:8px;background:rgba(15,17,20,.96);border-top:1px solid var(--line)}
+  .tabbar button{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:14px;padding:10px 8px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:6px}
+  .tabbar button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .tabbar .cnt{font-family:var(--mono);font-size:13px;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,.2)}
+  .tabbar .pulse{animation:tabpulse .6s ease 2}
+  @keyframes tabpulse{50%{transform:scale(1.06);box-shadow:0 0 0 4px rgba(245,197,49,.35)}}
+  .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  body[data-view="recipes"] .panel, body[data-view="recipes"] header.hero{display:none}
+  body[data-view="fridge"] .results{display:none}
+  .jump{display:none!important}
+}
 .label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
 .inputrow{display:flex;gap:8px}
 #ing-input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
@@ -322,6 +336,10 @@ button{font:inherit;cursor:pointer}
 </div>
 
 <button class="jump" id="jump" type="button" hidden></button>
+<nav class="tabbar" id="tabbar" role="tablist" aria-label="화면 바꾸기">
+  <button type="button" role="tab" id="tab-fridge" aria-selected="true">냉장고 <span class="cnt" id="cnt-fridge">0</span></button>
+  <button type="button" role="tab" id="tab-recipes" aria-selected="false">레시피 <span class="cnt" id="cnt-recipes">0</span></button>
+</nav>
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-t">
   <div class="sheet-card">
     <img class="sheet-ic" src="icon-180.png" alt="" width="64" height="64">
@@ -716,13 +734,30 @@ function toggle(x){
 }
 function focusOn(x){ focusIng = x; renderResults(); }
 let jumpTimer = 0;
+let view = "fridge";
+function setView(v, scroll = true){
+  view = v; document.body.dataset.view = v;
+  $("tab-fridge").setAttribute("aria-selected", v === "fridge");
+  $("tab-recipes").setAttribute("aria-selected", v === "recipes");
+  if (scroll && innerWidth <= 820) window.scrollTo({top: 0});
+}
+function pulseRecipes(){ const t = $("tab-recipes"); t.classList.remove("pulse"); void t.offsetWidth; t.classList.add("pulse"); }
+function updateTabs(){
+  $("cnt-fridge").textContent = mine.length;
+  const n = document.querySelectorAll("#results .group .card").length;
+  $("cnt-recipes").textContent = n;
+}
 function showJump(x){
+  if (innerWidth <= 820) { pulseRecipes(); return; }
   const b = $("jump"); if (!b || innerWidth > 820) return;
   const n = (YT_ING[x] || []).length;
   b.textContent = (n && showTrend) ? x + " 숏츠 " + n + "개 보기 ↓" : x + " 요리 보기 ↓";
   b.hidden = false; clearTimeout(jumpTimer); jumpTimer = setTimeout(() => { b.hidden = true; }, 5000);
 }
 
+$("tab-fridge").addEventListener("click", () => setView("fridge"));
+$("tab-recipes").addEventListener("click", () => setView("recipes"));
+setView("fridge", false);
 $("ing-form").addEventListener("submit", e => { e.preventDefault(); const v = $("ing-input").value; if (v.trim()) add(v); $("ing-input").value = ""; $("ing-input").focus(); });
 $("easy").checked = easyOnly;
 $("easy").addEventListener("change", e => { easyOnly = e.target.checked; try { localStorage.setItem("fridge-easy", easyOnly ? "1" : "0"); } catch (err) {} renderResults(); renderOps(); });
@@ -730,7 +765,7 @@ $("kid-on").checked = kidOnly;
 $("kid-on").addEventListener("change", e => { kidOnly = e.target.checked; try { localStorage.setItem("fridge-kid", kidOnly ? "1" : "0"); } catch (err) {} renderResults(); renderOps(); });
 $("trend-on").checked = showTrend;
 $("trend-on").addEventListener("change", e => { showTrend = e.target.checked; try { localStorage.setItem("fridge-trend", showTrend ? "1" : "0"); } catch (err) {} renderResults(); });
-const scrollResults = () => (document.getElementById("trend") || document.querySelector(".results > section, .results > .group"))?.scrollIntoView({behavior:"smooth", block:"start"});
+const scrollResults = () => (innerWidth <= 820 ? setView("recipes") : 0, document.getElementById("trend") || document.querySelector(".results > section, .results > .group"))?.scrollIntoView({behavior:"smooth", block:"start"});
 $("jump").addEventListener("click", () => { $("jump").hidden = true; scrollResults(); });
 function renderFridge(){
   const b = $("myfridge"); if (!b) return;
@@ -773,6 +808,7 @@ $("savebtn").addEventListener("click", () => {
   // 처음 화면처럼 맨 위로 올라간 뒤: 열린 냉장고에 재료가 들어가고 → 문이 휙 닫히고 → 쿵
   const b = $("myfridge"), inside = $("fz-inside"), m = $("savemsg");
   $("jump").hidden = true; clearTimeout(jumpTimer);
+  setView("fridge", false);
   window.scrollTo({top: 0, behavior: "smooth"});
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   inside.replaceChildren();
@@ -938,6 +974,7 @@ function renderResults(){
   if (two.length) out.append(group("두 개만 더 털어오면", two.length + "가지", null, two));
   if (!list.length && !shown.size && !mine.some(isCustom)) out.append(el("div","empty", mine.length ? (easyOnly ? "이 재료로 10분 안에 되는 요리는 못 찾았어요. 재료를 더 넣거나 초간단 필터를 꺼보세요." : (kidOnly ? "이 재료로 만들 수 있는 유아식을 못 찾았어요. 재료를 더 넣거나 유아식 모드를 꺼보세요." : "이 재료로 맞는 요리를 목록에서 못 찾았어요. 재료를 더 넣거나 아래에서 Claude에게 물어보세요.")) : (pending ? "내 냉장고를 누르면 지난번에 담아둔 재료를 꺼내와요." : "냉장고가 텅 비었어요. 재료를 담아주면 뭉치가 출동해요.")));
   renderAI(); out.append(aiSection);
+  if ($("cnt-recipes")) updateTabs();
 }
 
 const eul = w => { const c = w.charCodeAt(w.length - 1) - 0xAC00; return (c >= 0 && c <= 11171 && c % 28) ? "을" : "를"; };
